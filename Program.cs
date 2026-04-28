@@ -1,4 +1,7 @@
-﻿using MdRenderer;
+﻿using Markdig;
+using Markdig.Syntax;
+
+using MdRenderer;
 
 if (args.Length == 0)
 {
@@ -20,14 +23,21 @@ try
     string content = await reader.ReadToEndAsync();
     // string content = File.ReadAllText(path);
     // Console.WriteLine(content);
-    var parser = new Parser();
-    var blocks = parser.Parse(content);
+    // var parser = new Parser();
+
+    MarkdownDocument doc = Markdown.Parse(content);
+
+    var renderer = new Renderer();
+
+    // var blocks = parser.Parse(content);
 
     // foreach (var block in blocks) {
     //     Console.WriteLine($"[{block.Type}] {block.Content}");
     // }
 
-    Renderer.Render(blocks);
+    // renderer.Render(blocks);
+    renderer.Render(doc);
+
 }
 catch (Exception err)
 {
