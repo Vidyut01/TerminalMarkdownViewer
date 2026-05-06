@@ -1,7 +1,7 @@
+using System.Text;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Spectre.Console;
-
 using MdRenderer.Utilities;
 
 namespace MdRenderer;
@@ -12,41 +12,41 @@ class Renderer
     private const int LeftMargin = 2;
     private readonly string _margin = new(' ', LeftMargin);
 
-    public void Render(MarkdownDocument doc)
+    private IAnsiConsole _console = null!;
+    private StringWriter _writer = null!;
+
+    public List<string> Render(MarkdownDocument doc)
     {
+        _writer = new StringWriter();
+        _console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.TrueColor,
+            Out = new AnsiConsoleOutput(_writer),
+        });
+
         foreach (var block in doc)
             RenderBlock(block);
+
+        return _writer.ToString().Split('\n').ToList();
     }
 
     private void RenderBlock(Block block)
     {
         switch (block)
         {
-            case HeadingBlock h:
-                RenderHeading(h);
-                break;
-            case ParagraphBlock p:
-                RenderParagraph(p);
-                break;
-            case FencedCodeBlock code:
-                RenderCodeBlock(code);
-                break;
-            case ListBlock list:
-                RenderList(list);
-                break;
-            case QuoteBlock quote:
-                RenderQuote(quote);
-                break;
-            case ThematicBreakBlock:
-                RenderRule();
-                break;
+            case HeadingBlock h:    RenderHeading(h); break;
+            case ParagraphBlock p:  RenderParagraph(p); break;
+            case FencedCodeBlock c: RenderCodeBlock(c); break;
+            case ListBlock l:       RenderList(l); break;
+            case QuoteBlock q:      RenderQuote(q); break;
+            case ThematicBreakBlock: RenderRule(); break;
         }
     }
 
     private void RenderHeading(HeadingBlock heading)
     {
         string text = RenderInlines(heading.Inline);
-        int length = heading.Inline!.Span.Length;
 
         var (color, underline) = heading.Level switch
         {
@@ -59,20 +59,19 @@ class Renderer
         };
 
         if (underline)
-            AnsiConsole.MarkupLine($"{_margin}[underline {color}]{text}[/]");
+            _console.MarkupLine($"{_margin}[underline {color}]{text}[/]");
         else
-            AnsiConsole.MarkupLine($"{_margin}[{color}]{text}[/]");
+            _console.MarkupLine($"{_margin}[{color}]{text}[/]");
 
-
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
     }
 
     private void RenderParagraph(ParagraphBlock paragraph)
     {
         string text = RenderInlines(paragraph.Inline);
         foreach (var line in Wrap(text, MaxWidth))
-            AnsiConsole.MarkupLine($"{_margin}{line}");
-        AnsiConsole.WriteLine();
+            _console.MarkupLine($"{_margin}{line}");
+        _console.WriteLine();
     }
 
     private void RenderCodeBlock(FencedCodeBlock code)
@@ -81,11 +80,10 @@ class Renderer
             .Select(l => l.ToString())
             .SkipLast(1)
             .ToList();
-        
-        // Remove trailing empty lines
+
         while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[^1]))
             lines.RemoveAt(lines.Count - 1);
-        
+
         string content = string.Join('\n', lines);
 
         var panel = new Panel(StringUtilities.Escape(content))
@@ -95,9 +93,9 @@ class Renderer
             Padding = new Padding(1, 0)
         };
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(panel);
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
+        _console.Write(panel);
+        _console.WriteLine();
     }
 
     private void RenderList(ListBlock list)
@@ -108,47 +106,44 @@ class Renderer
             string bullet = list.IsOrdered ? $"{index++}." : "•";
             string color = list.IsOrdered ? "blue" : "yellow";
 
-            // grab the first paragraph inside the list item
             string text = item.FirstOrDefault() is ParagraphBlock p
-                ? RenderInlines(p.Inline)
-                : "";
+                ? RenderInlines(p.Inline) : "";
 
-            AnsiConsole.MarkupLine($"{_margin}  [{color}]{bullet}[/] {text}");
+            _console.MarkupLine($"{_margin}  [{color}]{bullet}[/] {text}");
 
-            // handle nested blocks inside the list item
             foreach (var child in item.Skip(1))
                 RenderBlock(child);
         }
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
     }
 
     private void RenderQuote(QuoteBlock quote)
     {
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
         foreach (var child in quote)
         {
             if (child is ParagraphBlock p)
             {
                 string text = RenderInlines(p.Inline);
                 foreach (var line in Wrap(text, MaxWidth - 4))
-                    AnsiConsole.MarkupLine($"{_margin}[magenta dim]│[/] [italic grey]{line}[/]");
+                    _console.MarkupLine($"{_margin}[magenta dim]│[/] [italic grey]{line}[/]");
             }
         }
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
     }
 
     private void RenderRule()
     {
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule() { Style = Style.Parse("grey dim") });
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
+        _console.Write(new Rule() { Style = Style.Parse("grey dim") });
+        _console.WriteLine();
     }
 
     private static string RenderInlines(ContainerInline? inlines)
     {
         if (inlines == null) return "";
 
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
 
         foreach (var inline in inlines)
         {
@@ -192,7 +187,7 @@ class Renderer
         }
 
         var words = text.Split(' ');
-        var line = new System.Text.StringBuilder();
+        var line = new StringBuilder();
 
         foreach (var word in words)
         {

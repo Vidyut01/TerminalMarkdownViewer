@@ -7,11 +7,15 @@ public class Main
 {
     public async Task<int> RunAsync(string filePath)
     {
-        string content = await File.ReadAllTextAsync(filePath);
-        MarkdownDocument doc = Markdown.Parse(content);
-        
-        var renderer = new Renderer();
-        renderer.Render(doc);
+        using var reader = new StreamReader(filePath);
+        string content = reader.ReadToEnd();
+
+        var doc = Markdown.Parse(content);
+        var renderer = new MdRenderer.Renderer();
+        var lines = renderer.Render(doc);
+
+        var pager = new MdRenderer.Pager(lines, filePath);
+        pager.Run();
         
         return 0;
     }

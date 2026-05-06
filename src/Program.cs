@@ -6,10 +6,18 @@ if (args.Length == 0)
     return 1;
 }
 
+string path = args[0];
+
+if (Directory.Exists(path))
+{
+    Console.Error.WriteLine($"mdrender: {path}: Is a directory");
+    return 1;
+}
+
 try
 {
     var app = new Main();
-    return await app.RunAsync(args[0]);
+    return await app.RunAsync(path);
 }
 catch (Exception err)
 {
